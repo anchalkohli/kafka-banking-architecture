@@ -3,10 +3,10 @@ server:
 
 spring:
   application:
-    name: mq-ingestion-service
+    name: ${SPRING_APPLICATION_NAME:mq-ingestion-service}
 
   kafka:
-    bootstrap-servers: kafka:9092
+    bootstrap-servers: ${SPRING_KAFKA_BOOTSTRAP_SERVERS:kafka:9092}
     producer:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.apache.kafka.common.serialization.StringSerializer
@@ -15,5 +15,5 @@ spring:
 
 app:
   kafka:
-    topic: raw-payments-emea
-    region: EMEA
+    topic: ${APP_KAFKA_TOPIC}
+    region: ${APP_KAFKA_REGION}
