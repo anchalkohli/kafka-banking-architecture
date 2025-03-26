@@ -1,12 +1,14 @@
 version: '3.8'
+
 services:
+
   zookeeper:
     image: confluentinc/cp-zookeeper:7.4.0
+    ports:
+      - "2181:2181"
     environment:
       ZOOKEEPER_CLIENT_PORT: 2181
       ZOOKEEPER_TICK_TIME: 2000
-    ports:
-      - "2181:2181"
 
   kafka:
     image: confluentinc/cp-kafka:7.4.0
@@ -17,21 +19,46 @@ services:
     environment:
       KAFKA_BROKER_ID: 1
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
 
-  mq-ingestion-service:
+  mq-ingestion-emea:
     build:
       context: ./kafka-banking-standard/mq-ingestion-service
-    container_name: mq-ingestion-service
+    container_name: mq-ingestion-emea
     ports:
       - "8081:8081"
     environment:
-      SPRING_PROFILES_ACTIVE: default
-    depends_on:
-      - kafka
+      SPRING_APPLICATION_NAME: mq-ingestion-emea
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      APP_KAFKA_TOPIC: raw-payments-emea
+      APP_KAFKA_REGION: EMEA
 
-    kafka-ui:
+  mq-ingestion-nam:
+    build:
+      context: ./kafka-banking-standard/mq-ingestion-service
+    container_name: mq-ingestion-nam
+    ports:
+      - "8082:8081"
+    environment:
+      SPRING_APPLICATION_NAME: mq-ingestion-nam
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      APP_KAFKA_TOPIC: raw-payments-nam
+      APP_KAFKA_REGION: NAM
+
+  mq-ingestion-aspac:
+    build:
+      context: ./kafka-banking-standard/mq-ingestion-service
+    container_name: mq-ingestion-aspac
+    ports:
+      - "8083:8081"
+    environment:
+      SPRING_APPLICATION_NAME: mq-ingestion-aspac
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      APP_KAFKA_TOPIC: raw-payments-aspac
+      APP_KAFKA_REGION: ASPAC
+
+  kafka-ui:
     image: provectuslabs/kafka-ui:latest
     container_name: kafka-ui
     ports:
