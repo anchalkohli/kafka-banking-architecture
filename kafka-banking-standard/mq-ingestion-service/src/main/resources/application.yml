@@ -20,10 +20,10 @@ app:
 
 ibm:
   mq:
-    queue-manager: ${IBM_MQ_QUEUE_MANAGER:QM1}
-    channel: ${IBM_MQ_CHANNEL:DEV.APP.SVRCONN}
+    queue-manager: ${IBM_MQ_QUEUE_MANAGER}
+    channel: ${IBM_MQ_CHANNEL}
     conn-name: ${IBM_MQ_CONN_NAME}
-    queue: ${IBM_MQ_QUEUE:TEST.QUEUE}
+    queue: ${IBM_MQ_QUEUE}
     user: ${IBM_MQ_USER}
     password: ${IBM_MQ_PASSWORD}
 
@@ -43,5 +43,5 @@ management:
 info:
   app:
     name: ${SPRING_APPLICATION_NAME}
+    region: ${APP_KAFKA_REGION}
     version: 1.0.0
-    region: ${APP_KAFKA_REGION:EMEA}
