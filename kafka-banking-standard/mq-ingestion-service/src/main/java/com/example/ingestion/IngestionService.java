@@ -15,20 +15,39 @@ public class IngestionService {
     private String kafkaTopic;
 
     public void processAndSendToKafka(String message) {
-        try {
-            kafkaTemplate.send(kafkaTopic, message).get(); // synchronous send
-            log.info("Message sent to topic: {}", kafkaTopic);
-        } catch (Exception ex) {
-            log.error("Kafka publish failed for topic [{}]. Sending to DLQ...", kafkaTopic, ex);
+    int attempts = 0;
+    int maxAttempts = 3;
+    long backoffMs = 2000;
 
-            // Route to DLQ
-            String dlqTopic = kafkaTopic.replace("raw", "dlq");
-            try {
-                kafkaTemplate.send(dlqTopic, message).get();
-                log.warn("Message rerouted to DLQ: {}", dlqTopic);
-            } catch (Exception dlqEx) {
-                log.error("DLQ publish also failed for topic [{}]", dlqTopic, dlqEx);
+    while (attempts < maxAttempts) {
+        try {
+            kafkaTemplate.send(kafkaTopic, message).get(); //synchronous send
+            log.info("Message sent successfully to topic: {}", kafkaTopic);
+            return;
+        } catch (Exception ex) {
+            attempts++;
+            log.warn("Attempt {} failed to publish to Kafka topic [{}]", attempts, kafkaTopic);
+
+            if (attempts < maxAttempts) {
+                try {
+                    Thread.sleep(backoffMs);
+                } catch (InterruptedException ie) {
+                    Thread.currentThread().interrupt();
+                }
             }
+        }
+    }
+
+    // All retries failed — send to DLQ
+    String dlqTopic = kafkaTopic.replace("raw", "dlq");
+    try {
+        kafkaTemplate.send(dlqTopic, message).get();
+        log.warn("Message sent to DLQ after retries: {}", dlqTopic);
+        dlqCounter.increment();  // metric
+    } catch (Exception dlqEx) {
+        log.error("Failed to send message to DLQ topic [{}]", dlqTopic, dlqEx);
+    }
+}
         }
     }
 }
