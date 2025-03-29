@@ -1,24 +1,25 @@
 package com.example.ingestion;
 
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
-@RequestMapping("/api/messages")
+@RequestMapping("/ingest")
 public class IngestionController {
 
-    private final IngestionService ingestionService;
-    private final String region;
+    private final KafkaTemplate<String, String> kafkaTemplate;
 
-    public IngestionController(IngestionService ingestionService,
-                               @Value("${app.kafka.region}") String region) {
-        this.ingestionService = ingestionService;
-        this.region = region;
+    @Value("${app.kafka.topic}")
+    private String topic;
+
+    public IngestionController(KafkaTemplate<String, String> kafkaTemplate) {
+        this.kafkaTemplate = kafkaTemplate;
     }
 
     @PostMapping
-    public String ingestMessage(@RequestBody String message) {
-        ingestionService.sendToKafka(message, region);
-        return "Message sent to Kafka for region: " + region;
+    public String publish(@RequestBody String message) {
+        kafkaTemplate.send(topic, message);
+        return "Message sent to Kafka topic: " + topic;
     }
 }
