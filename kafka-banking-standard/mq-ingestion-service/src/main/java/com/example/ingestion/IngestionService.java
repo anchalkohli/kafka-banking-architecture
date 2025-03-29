@@ -8,18 +8,27 @@ import org.springframework.stereotype.Service;
 @Service
 public class IngestionService {
 
-    private final KafkaTemplate<String, String> kafkaTemplate;
-    private final String topic;
+    @Autowired
+    private KafkaTemplate<String, String> kafkaTemplate;
 
-    public IngestionService(KafkaTemplate<String, String> kafkaTemplate,
-                            @Value("${app.kafka.topic}") String topic) {
-        this.kafkaTemplate = kafkaTemplate;
-        this.topic = topic;
-    }
+    @Value("${app.kafka.topic}")
+    private String kafkaTopic;
 
-    public void sendToKafka(String message, String region) {
-        String enrichedMessage = "[Region: " + region + "] " + message;
-        ProducerRecord<String, String> record = new ProducerRecord<>(topic, enrichedMessage);
-        kafkaTemplate.send(record);
+    public void processAndSendToKafka(String message) {
+        try {
+            kafkaTemplate.send(kafkaTopic, message).get(); // synchronous send
+            log.info("Message sent to topic: {}", kafkaTopic);
+        } catch (Exception ex) {
+            log.error("Kafka publish failed for topic [{}]. Sending to DLQ...", kafkaTopic, ex);
+
+            // Route to DLQ
+            String dlqTopic = kafkaTopic.replace("raw", "dlq");
+            try {
+                kafkaTemplate.send(dlqTopic, message).get();
+                log.warn("Message rerouted to DLQ: {}", dlqTopic);
+            } catch (Exception dlqEx) {
+                log.error("DLQ publish also failed for topic [{}]", dlqTopic, dlqEx);
+            }
+        }
     }
 }
