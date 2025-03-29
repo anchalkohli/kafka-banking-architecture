@@ -52,6 +52,46 @@ services:
     depends_on:
       - kafka
 
+  mq-ingestion-nam:
+     build:
+      context: ./kafka-banking-standard/mq-ingestion-service
+    ports:
+      - "8082:8081"
+    environment:
+      SPRING_APPLICATION_NAME: mq-ingestion-nam
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      SPRING_PROFILES_ACTIVE: nam
+      APP_KAFKA_TOPIC: raw-payments-nam
+      APP_KAFKA_REGION: NAM
+      IBM_MQ_QUEUE_MANAGER: QM1
+      IBM_MQ_CHANNEL: DEV.APP.SVRCONN
+      IBM_MQ_CONN_NAME: ibm-mq:1414
+      IBM_MQ_QUEUE: TEST.QUEUE
+      IBM_MQ_USER: app
+      IBM_MQ_PASSWORD: passw0rd
+    depends_on:
+      - kafka
+
+  mq-ingestion-aspac:
+    build:
+      context: ./kafka-banking-standard/mq-ingestion-service
+    ports:
+      - "8083:8081"
+    environment:
+      SPRING_APPLICATION_NAME: mq-ingestion-aspac
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      SPRING_PROFILES_ACTIVE: aspac
+      APP_KAFKA_TOPIC: raw-payments-aspac
+      APP_KAFKA_REGION: ASPAC
+      IBM_MQ_QUEUE_MANAGER: QM1
+      IBM_MQ_CHANNEL: DEV.APP.SVRCONN
+      IBM_MQ_CONN_NAME: ibm-mq:1414
+      IBM_MQ_QUEUE: TEST.QUEUE
+      IBM_MQ_USER: app
+      IBM_MQ_PASSWORD: passw0rd
+    depends_on:
+      - kafka
+
   ibm-mq:
     image: ibmcom/mq:latest
     ports:
