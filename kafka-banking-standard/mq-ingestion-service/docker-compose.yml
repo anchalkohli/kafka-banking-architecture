@@ -4,10 +4,10 @@ services:
 
   zookeeper:
     image: confluentinc/cp-zookeeper:7.3.2
-    environment:
-      ZOOKEEPER_CLIENT_PORT: 2181
     ports:
       - "2181:2181"
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
 
   kafka:
     image: confluentinc/cp-kafka:7.3.2
@@ -19,8 +19,6 @@ services:
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT
       KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
-      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
-      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
     depends_on:
       - zookeeper
 
@@ -28,86 +26,29 @@ services:
     image: confluentinc/cp-kafka:7.3.2
     depends_on:
       - kafka
-    entrypoint: [ "sh", "-c",
+    entrypoint: ["sh", "-c",
       "sleep 10 && \
        kafka-topics --bootstrap-server kafka:9092 \
        --create --if-not-exists --topic raw-payments-emea --partitions 3 --replication-factor 1 && \
        kafka-topics --bootstrap-server kafka:9092 \
-       --create --if-not-exists --topic raw-payments-nam --partitions 3 --replication-factor 1 && \
-       kafka-topics --bootstrap-server kafka:9092 \
-       --create --if-not-exists --topic raw-payments-aspac --partitions 3 --replication-factor 1 && \
-       kafka-topics --bootstrap-server kafka:9092 \
        --create --if-not-exists --topic dlq-payments-emea --partitions 3 --replication-factor 1 && \
        kafka-topics --bootstrap-server kafka:9092 \
+       --create --if-not-exists --topic raw-payments-nam --partitions 3 --replication-factor 1 && \
+       kafka-topics --bootstrap-server kafka:9092 \
        --create --if-not-exists --topic dlq-payments-nam --partitions 3 --replication-factor 1 && \
+       kafka-topics --bootstrap-server kafka:9092 \
+       --create --if-not-exists --topic raw-payments-aspac --partitions 3 --replication-factor 1 && \
        kafka-topics --bootstrap-server kafka:9092 \
        --create --if-not-exists --topic dlq-payments-aspac --partitions 3 --replication-factor 1"
     ]
 
-  kafka-ui:
-    image: provectuslabs/kafka-ui:latest
-    ports:
-      - "8085:8080"
-    environment:
-      KAFKA_CLUSTERS_0_NAME: local-kafka
-      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
-    depends_on:
-      - kafka
-
-  mq-ingestion-emea:
+  mq-ingestion:
     build:
       context: ./kafka-banking-standard/mq-ingestion-service
-    container_name: mq-ingestion-emea
     ports:
       - "8081:8081"
-    environment:
-      SPRING_PROFILES_ACTIVE: emea
-      APP_KAFKA_TOPIC: raw-payments-emea
-      APP_KAFKA_REGION: EMEA
-      IBM_MQ_QUEUE_MANAGER: QM1
-      IBM_MQ_CHANNEL: DEV.APP.SVRCONN
-      IBM_MQ_CONN_NAME: ibm-mq:1414
-      IBM_MQ_QUEUE: TEST.QUEUE
-      IBM_MQ_USER: app
-      IBM_MQ_PASSWORD: passw0rd
-    depends_on:
-      - kafka
-
-  mq-ingestion-nam:
-    build:
-      context: ./kafka-banking-standard/mq-ingestion-service
-    container_name: mq-ingestion-nam
-    ports:
-      - "8082:8081"
-    environment:
-      SPRING_PROFILES_ACTIVE: nam
-      APP_KAFKA_TOPIC: raw-payments-nam
-      APP_KAFKA_REGION: NAM
-      IBM_MQ_QUEUE_MANAGER: QM1
-      IBM_MQ_CHANNEL: DEV.APP.SVRCONN
-      IBM_MQ_CONN_NAME: ibm-mq:1414
-      IBM_MQ_QUEUE: TEST.QUEUE
-      IBM_MQ_USER: app
-      IBM_MQ_PASSWORD: passw0rd
-    depends_on:
-      - kafka
-
-  mq-ingestion-aspac:
-    build:
-      context: ./kafka-banking-standard/mq-ingestion-service
-    container_name: mq-ingestion-aspac
-    ports:
-      - "8083:8081"
-    environment:
-      SPRING_PROFILES_ACTIVE: aspac
-      APP_KAFKA_TOPIC: raw-payments-aspac
-      APP_KAFKA_REGION: ASPAC
-      IBM_MQ_QUEUE_MANAGER: QM1
-      IBM_MQ_CHANNEL: DEV.APP.SVRCONN
-      IBM_MQ_CONN_NAME: ibm-mq:1414
-      IBM_MQ_QUEUE: TEST.QUEUE
-      IBM_MQ_USER: app
-      IBM_MQ_PASSWORD: passw0rd
+    env_file:
+      - .env
     depends_on:
       - kafka
 
@@ -119,3 +60,31 @@ services:
       LICENSE: accept
       MQ_QMGR_NAME: QM1
       MQ_APP_PASSWORD: passw0rd
+
+  prometheus:
+    image: prom/prometheus
+    container_name: prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./deployment/prometheus.yml:/etc/prometheus/prometheus.yml
+    depends_on:
+      - mq-ingestion
+
+  grafana:
+    image: grafana/grafana
+    container_name: grafana
+    ports:
+      - "3000:3000"
+    depends_on:
+      - prometheus
+
+  kafka-ui:
+    image: provectuslabs/kafka-ui
+    ports:
+      - "8085:8080"
+    environment:
+      KAFKA_CLUSTERS_0_NAME: local
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
+    depends_on:
+      - kafka
