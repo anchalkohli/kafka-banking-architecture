@@ -42,53 +42,42 @@ services:
        --create --if-not-exists --topic dlq-payments-aspac --partitions 3 --replication-factor 1"
     ]
 
-  mq-ingestion:
+ mq-ingestion-emea:
     build:
       context: ./kafka-banking-standard/mq-ingestion-service
+    container_name: mq-ingestion-emea
+    env_file:
+      - ./env/.env.emea
+    volumes:
+      - ./tls:/tls
     ports:
       - "8081:8081"
-    env_file:
-      - .env
     depends_on:
       - kafka
 
   mq-ingestion-nam:
-     build:
+    build:
       context: ./kafka-banking-standard/mq-ingestion-service
+    container_name: mq-ingestion-nam
+    env_file:
+      - ./env/.env.nam
+    volumes:
+      - ./tls:/tls
     ports:
       - "8082:8081"
-    environment:
-      SPRING_APPLICATION_NAME: mq-ingestion-nam
-      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
-      SPRING_PROFILES_ACTIVE: nam
-      APP_KAFKA_TOPIC: raw-payments-nam
-      APP_KAFKA_REGION: NAM
-      IBM_MQ_QUEUE_MANAGER: QM1
-      IBM_MQ_CHANNEL: DEV.APP.SVRCONN
-      IBM_MQ_CONN_NAME: ibm-mq:1414
-      IBM_MQ_QUEUE: TEST.QUEUE
-      IBM_MQ_USER: app
-      IBM_MQ_PASSWORD: passw0rd
     depends_on:
       - kafka
 
   mq-ingestion-aspac:
     build:
       context: ./kafka-banking-standard/mq-ingestion-service
+    container_name: mq-ingestion-aspac
+    env_file:
+      - ./env/.env.aspac
+    volumes:
+      - ./tls:/tls
     ports:
       - "8083:8081"
-    environment:
-      SPRING_APPLICATION_NAME: mq-ingestion-aspac
-      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
-      SPRING_PROFILES_ACTIVE: aspac
-      APP_KAFKA_TOPIC: raw-payments-aspac
-      APP_KAFKA_REGION: ASPAC
-      IBM_MQ_QUEUE_MANAGER: QM1
-      IBM_MQ_CHANNEL: DEV.APP.SVRCONN
-      IBM_MQ_CONN_NAME: ibm-mq:1414
-      IBM_MQ_QUEUE: TEST.QUEUE
-      IBM_MQ_USER: app
-      IBM_MQ_PASSWORD: passw0rd
     depends_on:
       - kafka
 
