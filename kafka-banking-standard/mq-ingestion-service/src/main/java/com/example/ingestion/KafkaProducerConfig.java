@@ -1,32 +1,56 @@
 package com.example.ingestion;
 
-import org.apache.kafka.clients.producer.ProducerConfig;
-import org.apache.kafka.common.serialization.StringSerializer;
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
-import org.springframework.kafka.core.DefaultKafkaProducerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.kafka.core.KafkaTemplate;
-import org.springframework.kafka.core.ProducerFactory;
+import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.stereotype.Service;
 
-import java.util.HashMap;
-import java.util.Map;
+import javax.jms.TextMessage;
+import javax.jms.Message;
+import javax.jms.Queue;
+import javax.jms.Session;
+import javax.jms.ConnectionFactory;
+import javax.jms.Connection;
+import javax.jms.MessageConsumer;
 
-@Configuration
-public class KafkaProducerConfig {
-@Value("${spring.kafka.bootstrap-servers}")
-private String bootstrapServers;
+@Service
+public class IngestionService {
 
-    @Bean
-    public ProducerFactory<String, String> producerFactory() {
-        Map<String, Object> config = new HashMap<>();
-        config.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
-        config.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
-        config.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
-        return new DefaultKafkaProducerFactory<>(config);
+    private final KafkaTemplate<String, String> kafkaTemplate;
+    private final ConnectionFactory mqConnectionFactory;
+    private final String kafkaTopic;
+    private final String mqQueue;
+
+    public IngestionService(KafkaTemplate<String, String> kafkaTemplate,
+                            ConnectionFactory mqConnectionFactory,
+                            @Value("${app.kafka.topic}") String kafkaTopic,
+                            @Value("${ibm.mq.queue}") String mqQueue) {
+        this.kafkaTemplate = kafkaTemplate;
+        this.mqConnectionFactory = mqConnectionFactory;
+        this.kafkaTopic = kafkaTopic;
+        this.mqQueue = mqQueue;
     }
 
-    @Bean
-    public KafkaTemplate<String, String> kafkaTemplate() {
-        return new KafkaTemplate<>(producerFactory());
+    @Scheduled(fixedRate = 2000)
+    public void pollFromMqAndSendToKafka() {
+        try (Connection connection = mqConnectionFactory.createConnection()) {
+            connection.start();
+            Session session = connection.createSession(false, Session.AUTO_ACKNOWLEDGE);
+            Queue queue = session.createQueue(mqQueue);
+            MessageConsumer consumer = session.createConsumer(queue);
+            Message message = consumer.receive(1000);
+
+            if (message instanceof TextMessage textMessage) {
+                String payload = textMessage.getText();
+                kafkaTemplate.send(kafkaTopic, payload);
+                System.out.println("Published to Kafka: " + payload);
+            }
+
+            session.close();
+            connection.close();
+
+        } catch (Exception e) {
+            System.err.println("Failed to read from MQ or publish to Kafka: " + e.getMessage());
+        }
     }
 }
