@@ -46,6 +46,11 @@
              <artifactId>spring-boot-starter-actuator</artifactId>
         </dependency>
 
+         <dependency>
+             <groupId>org.apache.kafka</groupId>
+             <artifactId>kafka-clients</artifactId>
+         </dependency>
+             
          <!-- Optional metrics Exporter  -->
           <dependency>
              <groupId>io.micrometer</groupId>
