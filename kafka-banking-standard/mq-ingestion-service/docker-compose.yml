@@ -22,25 +22,27 @@ services:
     depends_on:
       - zookeeper
 
-  kafka-init:
+ kafka-init:
     image: confluentinc/cp-kafka:7.3.2
+    container_name: kafka-init
     depends_on:
       - kafka
-    entrypoint: ["sh", "-c",
-      "sleep 10 && \
-       kafka-topics --bootstrap-server kafka:9092 \
-       --create --if-not-exists --topic raw-payments-emea --partitions 3 --replication-factor 1 && \
-       kafka-topics --bootstrap-server kafka:9092 \
-       --create --if-not-exists --topic dlq-payments-emea --partitions 3 --replication-factor 1 && \
-       kafka-topics --bootstrap-server kafka:9092 \
-       --create --if-not-exists --topic raw-payments-nam --partitions 3 --replication-factor 1 && \
-       kafka-topics --bootstrap-server kafka:9092 \
-       --create --if-not-exists --topic dlq-payments-nam --partitions 3 --replication-factor 1 && \
-       kafka-topics --bootstrap-server kafka:9092 \
-       --create --if-not-exists --topic raw-payments-aspac --partitions 3 --replication-factor 1 && \
-       kafka-topics --bootstrap-server kafka:9092 \
-       --create --if-not-exists --topic dlq-payments-aspac --partitions 3 --replication-factor 1"
-    ]
+    entrypoint: ["/bin/sh", "-c"]
+    command: >
+      "
+      sleep 10 &&
+      echo 'Creating Kafka topics...' &&
+      
+      kafka-topics --bootstrap-server kafka:9092 --create --if-not-exists --topic raw-payments-emea --partitions 6 --replication-factor 1 &&
+      kafka-topics --bootstrap-server kafka:9092 --create --if-not-exists --topic raw-payments-nam --partitions 3 --replication-factor 1 &&
+      kafka-topics --bootstrap-server kafka:9092 --create --if-not-exists --topic raw-payments-aspac --partitions 3 --replication-factor 1 &&
+
+      kafka-topics --bootstrap-server kafka:9092 --create --if-not-exists --topic dlq-payments-emea --partitions 2 --replication-factor 1 &&
+      kafka-topics --bootstrap-server kafka:9092 --create --if-not-exists --topic dlq-payments-nam --partitions 2 --replication-factor 1 &&
+      kafka-topics --bootstrap-server kafka:9092 --create --if-not-exists --topic dlq-payments-aspac --partitions 2 --replication-factor 1 &&
+
+      echo 'Kafka topic creation complete.'
+      "
 
  mq-ingestion-emea:
     build:
