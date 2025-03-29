@@ -1,56 +1,52 @@
-package com.example.ingestion;
+package com.example.config;
 
+import org.apache.kafka.clients.producer.ProducerConfig;
+import org.apache.kafka.common.serialization.StringSerializer;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.kafka.core.DefaultKafkaProducerFactory;
 import org.springframework.kafka.core.KafkaTemplate;
-import org.springframework.scheduling.annotation.Scheduled;
-import org.springframework.stereotype.Service;
+import org.springframework.kafka.core.ProducerFactory;
 
-import javax.jms.TextMessage;
-import javax.jms.Message;
-import javax.jms.Queue;
-import javax.jms.Session;
-import javax.jms.ConnectionFactory;
-import javax.jms.Connection;
-import javax.jms.MessageConsumer;
+import java.util.HashMap;
+import java.util.Map;
 
-@Service
-public class IngestionService {
+@Configuration
+public class KafkaProducerConfig {
 
-    private final KafkaTemplate<String, String> kafkaTemplate;
-    private final ConnectionFactory mqConnectionFactory;
-    private final String kafkaTopic;
-    private final String mqQueue;
+    @Value("${spring.kafka.bootstrap-servers}")
+    private String bootstrapServers;
 
-    public IngestionService(KafkaTemplate<String, String> kafkaTemplate,
-                            ConnectionFactory mqConnectionFactory,
-                            @Value("${app.kafka.topic}") String kafkaTopic,
-                            @Value("${ibm.mq.queue}") String mqQueue) {
-        this.kafkaTemplate = kafkaTemplate;
-        this.mqConnectionFactory = mqConnectionFactory;
-        this.kafkaTopic = kafkaTopic;
-        this.mqQueue = mqQueue;
+    @Value("${spring.kafka.properties.security.protocol:PLAINTEXT}")
+    private String securityProtocol;
+
+    @Value("${spring.kafka.properties.ssl.truststore.location:}")
+    private String truststoreLocation;
+
+    @Value("${spring.kafka.properties.ssl.truststore.password:}")
+    private String truststorePassword;
+
+    @Bean
+    public ProducerFactory<String, String> producerFactory() {
+        Map<String, Object> config = new HashMap<>();
+
+        config.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
+        config.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
+        config.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
+
+        // Optional: TLS settings for Kafka
+        config.put("security.protocol", securityProtocol);
+        if (truststoreLocation != null && !truststoreLocation.isEmpty()) {
+            config.put("ssl.truststore.location", truststoreLocation);
+            config.put("ssl.truststore.password", truststorePassword);
+        }
+
+        return new DefaultKafkaProducerFactory<>(config);
     }
 
-    @Scheduled(fixedRate = 2000)
-    public void pollFromMqAndSendToKafka() {
-        try (Connection connection = mqConnectionFactory.createConnection()) {
-            connection.start();
-            Session session = connection.createSession(false, Session.AUTO_ACKNOWLEDGE);
-            Queue queue = session.createQueue(mqQueue);
-            MessageConsumer consumer = session.createConsumer(queue);
-            Message message = consumer.receive(1000);
-
-            if (message instanceof TextMessage textMessage) {
-                String payload = textMessage.getText();
-                kafkaTemplate.send(kafkaTopic, payload);
-                System.out.println("Published to Kafka: " + payload);
-            }
-
-            session.close();
-            connection.close();
-
-        } catch (Exception e) {
-            System.err.println("Failed to read from MQ or publish to Kafka: " + e.getMessage());
-        }
+    @Bean
+    public KafkaTemplate<String, String> kafkaTemplate() {
+        return new KafkaTemplate<>(producerFactory());
     }
 }
