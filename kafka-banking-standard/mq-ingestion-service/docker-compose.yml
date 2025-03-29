@@ -3,24 +3,56 @@ version: '3.8'
 services:
 
   zookeeper:
-    image: confluentinc/cp-zookeeper:7.4.0
-    ports:
-      - "2181:2181"
+    image: confluentinc/cp-zookeeper:7.3.2
     environment:
       ZOOKEEPER_CLIENT_PORT: 2181
-      ZOOKEEPER_TICK_TIME: 2000
+    ports:
+      - "2181:2181"
 
   kafka:
-    image: confluentinc/cp-kafka:7.4.0
-    depends_on:
-      - zookeeper
+    image: confluentinc/cp-kafka:7.3.2
     ports:
       - "9092:9092"
     environment:
       KAFKA_BROKER_ID: 1
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT
       KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+    depends_on:
+      - zookeeper
+
+  kafka-init:
+    image: confluentinc/cp-kafka:7.3.2
+    depends_on:
+      - kafka
+    entrypoint: [ "sh", "-c",
+      "sleep 10 && \
+       kafka-topics --bootstrap-server kafka:9092 \
+       --create --if-not-exists --topic raw-payments-emea --partitions 3 --replication-factor 1 && \
+       kafka-topics --bootstrap-server kafka:9092 \
+       --create --if-not-exists --topic raw-payments-nam --partitions 3 --replication-factor 1 && \
+       kafka-topics --bootstrap-server kafka:9092 \
+       --create --if-not-exists --topic raw-payments-aspac --partitions 3 --replication-factor 1 && \
+       kafka-topics --bootstrap-server kafka:9092 \
+       --create --if-not-exists --topic dlq-payments-emea --partitions 3 --replication-factor 1 && \
+       kafka-topics --bootstrap-server kafka:9092 \
+       --create --if-not-exists --topic dlq-payments-nam --partitions 3 --replication-factor 1 && \
+       kafka-topics --bootstrap-server kafka:9092 \
+       --create --if-not-exists --topic dlq-payments-aspac --partitions 3 --replication-factor 1"
+    ]
+
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    ports:
+      - "8085:8080"
+    environment:
+      KAFKA_CLUSTERS_0_NAME: local-kafka
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
+    depends_on:
+      - kafka
 
   mq-ingestion-emea:
     build:
@@ -29,10 +61,17 @@ services:
     ports:
       - "8081:8081"
     environment:
-      SPRING_APPLICATION_NAME: mq-ingestion-emea
-      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      SPRING_PROFILES_ACTIVE: emea
       APP_KAFKA_TOPIC: raw-payments-emea
       APP_KAFKA_REGION: EMEA
+      IBM_MQ_QUEUE_MANAGER: QM1
+      IBM_MQ_CHANNEL: DEV.APP.SVRCONN
+      IBM_MQ_CONN_NAME: ibm-mq:1414
+      IBM_MQ_QUEUE: TEST.QUEUE
+      IBM_MQ_USER: app
+      IBM_MQ_PASSWORD: passw0rd
+    depends_on:
+      - kafka
 
   mq-ingestion-nam:
     build:
@@ -41,10 +80,17 @@ services:
     ports:
       - "8082:8081"
     environment:
-      SPRING_APPLICATION_NAME: mq-ingestion-nam
-      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      SPRING_PROFILES_ACTIVE: nam
       APP_KAFKA_TOPIC: raw-payments-nam
       APP_KAFKA_REGION: NAM
+      IBM_MQ_QUEUE_MANAGER: QM1
+      IBM_MQ_CHANNEL: DEV.APP.SVRCONN
+      IBM_MQ_CONN_NAME: ibm-mq:1414
+      IBM_MQ_QUEUE: TEST.QUEUE
+      IBM_MQ_USER: app
+      IBM_MQ_PASSWORD: passw0rd
+    depends_on:
+      - kafka
 
   mq-ingestion-aspac:
     build:
@@ -53,19 +99,23 @@ services:
     ports:
       - "8083:8081"
     environment:
-      SPRING_APPLICATION_NAME: mq-ingestion-aspac
-      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      SPRING_PROFILES_ACTIVE: aspac
       APP_KAFKA_TOPIC: raw-payments-aspac
       APP_KAFKA_REGION: ASPAC
-
-  kafka-ui:
-    image: provectuslabs/kafka-ui:latest
-    container_name: kafka-ui
-    ports:
-      - "8085:8080"
+      IBM_MQ_QUEUE_MANAGER: QM1
+      IBM_MQ_CHANNEL: DEV.APP.SVRCONN
+      IBM_MQ_CONN_NAME: ibm-mq:1414
+      IBM_MQ_QUEUE: TEST.QUEUE
+      IBM_MQ_USER: app
+      IBM_MQ_PASSWORD: passw0rd
     depends_on:
       - kafka
+
+  ibm-mq:
+    image: ibmcom/mq:latest
+    ports:
+      - "1414:1414"
     environment:
-      - KAFKA_CLUSTERS_0_NAME=local
-      - KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS=kafka:9092
-      - KAFKA_CLUSTERS_0_ZOOKEEPER=zookeeper:2181
+      LICENSE: accept
+      MQ_QMGR_NAME: QM1
+      MQ_APP_PASSWORD: passw0rd
