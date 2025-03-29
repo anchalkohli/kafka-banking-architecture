@@ -17,3 +17,15 @@ app:
   kafka:
     topic: ${APP_KAFKA_TOPIC}
     region: ${APP_KAFKA_REGION}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, info, metrics
+  endpoint:
+    health:
+      show-details: always
+  health:
+    kafka:
+      enabled: true
