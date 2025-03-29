@@ -14,7 +14,7 @@
         <java.version>17</java.version>
         <spring.boot.version>3.1.0</spring.boot.version>
     </properties>
-
+         
     <dependencies>
         <!-- Spring Boot Starter -->
         <dependency>
@@ -46,6 +46,12 @@
              <artifactId>spring-boot-starter-actuator</artifactId>
         </dependency>
 
+         <!-- Optional metrics Exporter  -->
+         <dependency>
+             <groupId>io.micrometer</groupId>
+             <artifactId>micrometer-registry-prometheus</artifactId>
+         </dependency>    
+             
         <!-- Test -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
