@@ -4,7 +4,7 @@ services:
 
   zookeeper:
     image: confluentinc/cp-zookeeper:7.3.2
-    ports:
+    ports:.
       - "2181:2181"
     environment:
       ZOOKEEPER_CLIENT_PORT: 2181
@@ -22,7 +22,7 @@ services:
     depends_on:
       - zookeeper
 
- kafka-init:
+  kafka-init:
     image: confluentinc/cp-kafka:7.3.2
     container_name: kafka-init
     depends_on:
@@ -49,9 +49,9 @@ services:
       context: ./kafka-banking-standard/mq-ingestion-service
     container_name: mq-ingestion-emea
     env_file:
-      - ./env/.env.emea
+      - ../env/.env.emea
     volumes:
-      - ./tls:/tls
+      - ../tls:/tls
     ports:
       - "8081:8081"
     depends_on:
@@ -100,7 +100,9 @@ services:
     volumes:
       - ./deployment/prometheus.yml:/etc/prometheus/prometheus.yml
     depends_on:
-      - mq-ingestion
+      - mq-ingestion-emea
+      - mq-ingestion-nam
+      - mq-ingestion-aspac
 
   grafana:
     image: grafana/grafana
