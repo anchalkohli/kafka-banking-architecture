@@ -83,6 +83,21 @@ services:
     depends_on:
       - kafka
 
+ dlq-replay-service:
+    build:
+      context: ./kafka-banking-standard/dlq-replay-service
+    container_name: dlq-replay-service
+    ports:
+      - "8085:8085"
+    environment:
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      SPRING_KAFKA_CONSUMER_GROUP_ID: dlq-replayer
+      SPRING_KAFKA_CONSUMER_AUTO_OFFSET_RESET: earliest
+    depends_on:
+      - kafka
+    networks:
+      - kafka_net
+    
   ibm-mq:
     image: ibmcom/mq:latest
     ports:
@@ -121,3 +136,7 @@ services:
       KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
     depends_on:
       - kafka
+      
+  networks:
+  kafka_net:
+    external: true
