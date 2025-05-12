@@ -137,6 +137,6 @@ services:
     depends_on:
       - kafka
       
-  networks:
+networks:
   kafka_net:
-    external: true
+    driver: bridge
