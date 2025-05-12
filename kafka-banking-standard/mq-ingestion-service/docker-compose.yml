@@ -4,13 +4,17 @@ services:
 
   zookeeper:
     image: confluentinc/cp-zookeeper:7.3.2
-    ports:.
+    container_name: zookeeper
+    ports:
       - "2181:2181"
     environment:
       ZOOKEEPER_CLIENT_PORT: 2181
+    networks:
+      - kafka_net
 
   kafka:
     image: confluentinc/cp-kafka:7.3.2
+    container_name: kafka
     ports:
       - "9092:9092"
     environment:
@@ -21,6 +25,13 @@ services:
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
     depends_on:
       - zookeeper
+    networks:
+      - kafka_net
+    healthcheck:
+      test: ["CMD", "kafka-topics", "--bootstrap-server", "localhost:9092", "--list"]
+      interval: 10s
+      timeout: 10s
+      retries: 5
 
   kafka-init:
     image: confluentinc/cp-kafka:7.3.2
@@ -32,7 +43,7 @@ services:
       "
       sleep 10 &&
       echo 'Creating Kafka topics...' &&
-      
+
       kafka-topics --bootstrap-server kafka:9092 --create --if-not-exists --topic raw-payments-emea --partitions 6 --replication-factor 1 &&
       kafka-topics --bootstrap-server kafka:9092 --create --if-not-exists --topic raw-payments-nam --partitions 3 --replication-factor 1 &&
       kafka-topics --bootstrap-server kafka:9092 --create --if-not-exists --topic raw-payments-aspac --partitions 3 --replication-factor 1 &&
@@ -43,19 +54,28 @@ services:
 
       echo 'Kafka topic creation complete.'
       "
+    networks:
+      - kafka_net
 
- mq-ingestion-emea:
+  mq-ingestion-emea:
     build:
       context: ./kafka-banking-standard/mq-ingestion-service
     container_name: mq-ingestion-emea
     env_file:
-      - ../env/.env.emea
+      - ./env/.env.emea
     volumes:
-      - ../tls:/tls
+      - ./tls:/tls
     ports:
       - "8081:8081"
     depends_on:
       - kafka
+    networks:
+      - kafka_net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8081/actuator/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
 
   mq-ingestion-nam:
     build:
@@ -69,6 +89,8 @@ services:
       - "8082:8081"
     depends_on:
       - kafka
+    networks:
+      - kafka_net
 
   mq-ingestion-aspac:
     build:
@@ -82,8 +104,10 @@ services:
       - "8083:8081"
     depends_on:
       - kafka
+    networks:
+      - kafka_net
 
- dlq-replay-service:
+  dlq-replay-service:
     build:
       context: ./kafka-banking-standard/dlq-replay-service
     container_name: dlq-replay-service
@@ -97,15 +121,25 @@ services:
       - kafka
     networks:
       - kafka_net
-    
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8085/actuator/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+    profiles:
+      - dlq
+
   ibm-mq:
     image: ibmcom/mq:latest
+    container_name: ibm-mq
     ports:
       - "1414:1414"
     environment:
       LICENSE: accept
       MQ_QMGR_NAME: QM1
       MQ_APP_PASSWORD: passw0rd
+    networks:
+      - kafka_net
 
   prometheus:
     image: prom/prometheus
@@ -118,6 +152,10 @@ services:
       - mq-ingestion-emea
       - mq-ingestion-nam
       - mq-ingestion-aspac
+    networks:
+      - kafka_net
+    profiles:
+      - observability
 
   grafana:
     image: grafana/grafana
@@ -126,17 +164,26 @@ services:
       - "3000:3000"
     depends_on:
       - prometheus
+    networks:
+      - kafka_net
+    profiles:
+      - observability
 
   kafka-ui:
     image: provectuslabs/kafka-ui
+    container_name: kafka-ui
     ports:
-      - "8085:8080"
+      - "8086:8080"
     environment:
       KAFKA_CLUSTERS_0_NAME: local
       KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
     depends_on:
       - kafka
-      
+    networks:
+      - kafka_net
+    profiles:
+      - monitoring
+
 networks:
   kafka_net:
     driver: bridge
